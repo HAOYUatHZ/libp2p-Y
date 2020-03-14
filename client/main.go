@@ -1,7 +1,7 @@
 package main
 
 import (
-	// "bufio"
+	"bufio"
 	"context"
 	"crypto/rand"
 	// "crypto/sha256"
@@ -12,7 +12,7 @@ import (
 	"io"
 	"log"
 	mrand "math/rand"
-	// "os"
+	"os"
 	// "strconv"
 	// "strings"
 	// "sync"
@@ -24,8 +24,8 @@ import (
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	host "github.com/libp2p/go-libp2p-host"
 	// net "github.com/libp2p/go-libp2p-net"
-	// peer "github.com/libp2p/go-libp2p-peer"
-	// pstore "github.com/libp2p/go-libp2p-peerstore"
+	peer "github.com/libp2p/go-libp2p-peer"
+	pstore "github.com/libp2p/go-libp2p-peerstore"
 	ma "github.com/multiformats/go-multiaddr"
 	// gologging "github.com/whyrusleeping/go-logging"
 
@@ -33,11 +33,6 @@ import (
 )
 
 func main() {
-	// golog.LevelDebug
-	// golog.LevelInfo
-	// golog.LevelError
-	// golog.LevelFatal
-	// golog.LevelPanic
 	golog.SetAllLoggers(golog.LevelInfo)
 
 	// listenP := flag.Int("l", 0, "wait for incoming connections")
@@ -46,17 +41,57 @@ func main() {
 	// }
 
 	// Make a host that listens on the given multiaddress
-	ha, err := makeBasicHost(6000, 0)
+	ha, err := makeBasicHost(6001, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Println("listening for connections")
-	// Set a stream handler on host A. /p2p/1.0.0 is
-	// a user-defined protocol name.
 	ha.SetStreamHandler("/p2p/1.0.0", common.HandleStream)
 
-	select {}
+	// The following code extracts target's peer ID from the
+	// given multiaddress
+	target := os.Args[1]
+	ipfsaddr, err := ma.NewMultiaddr(target)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	pid, err := ipfsaddr.ValueForProtocol(ma.P_IPFS)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	peerid, err := peer.IDB58Decode(pid)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	// Decapsulate the /ipfs/<peerID> part from the target
+	// /ip4/<a.b.c.d>/ipfs/<peer> becomes /ip4/<a.b.c.d>
+	targetPeerAddr, _ := ma.NewMultiaddr(
+		fmt.Sprintf("/ipfs/%s", peer.IDB58Encode(peerid)))
+	targetAddr := ipfsaddr.Decapsulate(targetPeerAddr)
+
+	// We have a peer ID and a targetAddr so we add it to the peerstore
+	// so LibP2P knows how to contact it
+	ha.Peerstore().AddAddr(peerid, targetAddr, pstore.PermanentAddrTTL)
+
+	log.Println("opening stream")
+	// make a new stream from host B to host A
+	// it should be handled on host A by the handler we set above because
+	// we use the same /p2p/1.0.0 protocol
+	s, err := ha.NewStream(context.Background(), peerid, "/p2p/1.0.0")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	// Create a buffered stream so that read and writes are non blocking.
+	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+
+	// Create a thread to read and write data.
+	go common.WriteData(rw)
+	go common.ReadData(rw)
+
+	select {} // hang forever
 }
 
 // makeBasicHost creates a LibP2P host with a random peer ID listening on the
@@ -98,7 +133,5 @@ func makeBasicHost(listenPort int, randseed int64) (host.Host, error) {
 	addr := basicHost.Addrs()[0]
 	fullAddr := addr.Encapsulate(hostAddr)
 	log.Printf("I am %s\n", fullAddr)
-	// log.Printf("Now run \"go run client/main.go -l %d -d %s\" on a different terminal\n", listenPort+1, fullAddr)
-	log.Printf("Now run \"go run client/main.go %s\" on a different terminal\n", fullAddr)
 	return basicHost, nil
 }
