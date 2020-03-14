@@ -27,7 +27,6 @@ require (
 	github.com/prometheus/client_model v0.0.0-20191202183732-d1d2010b5bee // indirect
 	github.com/prometheus/procfs v0.0.8 // indirect
 	github.com/rs/zerolog v1.17.2 // indirect
-	github.com/whyrusleeping/go-logging v0.0.1
 	go.opencensus.io v0.22.3 // indirect
 	go.uber.org/atomic v1.5.1 // indirect
 	go.uber.org/multierr v1.4.0 // indirect

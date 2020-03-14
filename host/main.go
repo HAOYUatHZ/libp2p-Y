@@ -19,7 +19,7 @@ import (
 	// "time"
 
 	// "github.com/davecgh/go-spew/spew"
-	// golog "github.com/ipfs/go-log"
+	golog "github.com/ipfs/go-log"
 	libp2p "github.com/libp2p/go-libp2p"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	host "github.com/libp2p/go-libp2p-host"
@@ -33,7 +33,12 @@ import (
 )
 
 func main() {
-	// golog.SetAllLoggers(gologging.INFO)
+	// golog.LevelDebug
+	// golog.LevelInfo
+	// golog.LevelError
+	// golog.LevelFatal
+	// golog.LevelPanic
+	golog.SetAllLoggers(golog.LevelInfo)
 
 	// listenP := flag.Int("l", 0, "wait for incoming connections")
 	// if *listenP == 0 {
