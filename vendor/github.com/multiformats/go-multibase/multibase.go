@@ -16,6 +16,7 @@ type Encoding int
 // supported yet
 const (
 	Identity          = 0x00
+	Base1             = '1'
 	Base2             = '0'
 	Base8             = '7'
 	Base10            = '9'

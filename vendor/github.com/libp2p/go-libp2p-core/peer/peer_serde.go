@@ -1,4 +1,4 @@
-// Package peer contains Protobuf and JSON serialization/deserialization methods for peer IDs.
+// This file contains Protobuf and JSON serialization/deserialization methods for peer IDs.
 package peer
 
 import (
@@ -21,7 +21,7 @@ func (id ID) Marshal() ([]byte, error) {
 	return []byte(id), nil
 }
 
-// MarshalBinary returns the byte representation of the peer ID.
+// BinaryMarshal returns the byte representation of the peer ID.
 func (id ID) MarshalBinary() ([]byte, error) {
 	return id.Marshal()
 }
@@ -35,12 +35,12 @@ func (id *ID) Unmarshal(data []byte) (err error) {
 	return err
 }
 
-// UnmarshalBinary sets the ID from its binary representation.
+// BinaryUnmarshal sets the ID from its binary representation.
 func (id *ID) UnmarshalBinary(data []byte) error {
 	return id.Unmarshal(data)
 }
 
-// Size implements Gogo's proto.Sizer, but we omit the compile-time assertion to avoid introducing a hard
+// Implements Gogo's proto.Sizer, but we omit the compile-time assertion to avoid introducing a hard
 // dependency on gogo.
 func (id ID) Size() int {
 	return len([]byte(id))
@@ -59,12 +59,12 @@ func (id *ID) UnmarshalJSON(data []byte) (err error) {
 	return err
 }
 
-// MarshalText returns the text encoding of the ID.
+// TextMarshal returns the text encoding of the ID.
 func (id ID) MarshalText() ([]byte, error) {
 	return []byte(IDB58Encode(id)), nil
 }
 
-// UnmarshalText restores the ID from its text encoding.
+// TextUnmarshal restores the ID from its text encoding.
 func (id *ID) UnmarshalText(data []byte) error {
 	pid, err := IDB58Decode(string(data))
 	if err != nil {

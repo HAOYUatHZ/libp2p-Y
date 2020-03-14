@@ -1,7 +1,7 @@
 package libp2p
 
 // This file contains all libp2p configuration options (except the defaults,
-// those are in defaults.go).
+// those are in defaults.go)
 
 import (
 	"fmt"
@@ -147,13 +147,13 @@ func Peerstore(ps peerstore.Peerstore) Option {
 }
 
 // PrivateNetwork configures libp2p to use the given private network protector.
-func PrivateNetwork(psk pnet.PSK) Option {
+func PrivateNetwork(prot pnet.Protector) Option {
 	return func(cfg *Config) error {
-		if cfg.PSK != nil {
+		if cfg.Protector != nil {
 			return fmt.Errorf("cannot specify multiple private network options")
 		}
 
-		cfg.PSK = psk
+		cfg.Protector = prot
 		return nil
 	}
 }
@@ -228,11 +228,9 @@ func DisableRelay() Option {
 	}
 }
 
-// EnableAutoRelay configures libp2p to enable the AutoRelay subsystem.
-//
-// Dependencies:
-//  * Relay (enabled by default)
-//  * Routing (to find relays), or StaticRelays/DefaultStaticRelays.
+// EnableAutoRelay configures libp2p to enable the AutoRelay subsystem. It is an
+// error to enable AutoRelay without enabling relay (enabled by default) and
+// routing (not enabled by default).
 //
 // This subsystem performs two functions:
 //
@@ -251,7 +249,7 @@ func EnableAutoRelay() Option {
 
 // StaticRelays configures known relays for autorelay; when this option is enabled
 // then the system will use the configured relays instead of querying the DHT to
-// discover relays.
+// discover relays
 func StaticRelays(relays []peer.AddrInfo) Option {
 	return func(cfg *Config) error {
 		cfg.StaticRelays = append(cfg.StaticRelays, relays...)
@@ -259,7 +257,7 @@ func StaticRelays(relays []peer.AddrInfo) Option {
 	}
 }
 
-// DefaultStaticRelays configures the static relays to use the known PL-operated relays.
+// DefaultStaticRelays configures the static relays to use the known PL-operated relays
 func DefaultStaticRelays() Option {
 	return func(cfg *Config) error {
 		for _, addr := range autorelay.DefaultRelays {
@@ -294,7 +292,7 @@ func FilterAddresses(addrs ...*net.IPNet) Option {
 }
 
 // Filters configures libp2p to use the given filters for accepting/denying
-// certain addresses. Filters offers more control and should be used when the
+// certain addresses. Filters offers more control and should be use when the
 // addresses you want to accept/deny are not known ahead of time and can
 // dynamically change.
 func Filters(filters *filter.Filters) Option {

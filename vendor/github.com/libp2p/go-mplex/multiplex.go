@@ -192,10 +192,14 @@ func (mp *Multiplex) handleOutgoing() {
 			return
 
 		case data := <-mp.writeCh:
-			err := mp.writeMsg(data)
+			// FIXME: https://github.com/libp2p/go-libp2p/issues/644
+			// write coalescing disabled until this can be fixed.
+			//err := mp.writeMsg(data)
+			err := mp.doWriteMsg(data)
+			pool.Put(data)
 			if err != nil {
 				// the connection is closed by this time
-				log.Warnf("error writing data: %s", err.Error())
+				log.Warningf("error writing data: %s", err.Error())
 				return
 			}
 		}
@@ -482,7 +486,7 @@ func (mp *Multiplex) handleIncoming() {
 				// closed stream, return b
 				pool.Put(b)
 
-				log.Warnf("Received data from remote after stream was closed by them. (len = %d)", len(b))
+				log.Warningf("Received data from remote after stream was closed by them. (len = %d)", len(b))
 				// go mp.sendResetMsg(msch.id.header(resetTag), false)
 				continue
 			}
@@ -494,7 +498,7 @@ func (mp *Multiplex) handleIncoming() {
 				pool.Put(b)
 			case <-recvTimeout.C:
 				pool.Put(b)
-				log.Warnf("timed out receiving message into stream queue.")
+				log.Warningf("timed out receiving message into stream queue.")
 				// Do not do this asynchronously. Otherwise, we
 				// could drop a message, then receive a message,
 				// then reset.
@@ -532,7 +536,7 @@ func (mp *Multiplex) sendResetMsg(header uint64, hard bool) {
 	err := mp.sendMsg(ctx.Done(), header, nil)
 	if err != nil && !mp.isShutdown() {
 		if hard {
-			log.Warnf("error sending reset message: %s; killing connection", err.Error())
+			log.Warningf("error sending reset message: %s; killing connection", err.Error())
 			mp.Close()
 		} else {
 			log.Debugf("error sending reset message: %s", err.Error())

@@ -304,11 +304,9 @@ func (s *Session) Ping() (time.Duration, error) {
 
 	// Wait for a response
 	start := time.Now()
-	timer := time.NewTimer(s.config.ConnectionWriteTimeout)
-	defer timer.Stop()
 	select {
 	case <-ch:
-	case <-timer.C:
+	case <-time.After(s.config.ConnectionWriteTimeout):
 		s.pingLock.Lock()
 		delete(s.pings, id) // Ignore it if a response comes later.
 		s.pingLock.Unlock()
@@ -318,7 +316,7 @@ func (s *Session) Ping() (time.Duration, error) {
 	}
 
 	// Compute the RTT
-	return time.Since(start), nil
+	return time.Now().Sub(start), nil
 }
 
 // startKeepalive starts the keepalive process.
@@ -405,20 +403,25 @@ func (s *Session) sendLoop() error {
 		return nil
 	}
 
-	writer := pool.Writer{W: s.conn}
+	writer := s.conn
 
-	var writeTimeout *time.Timer
-	var writeTimeoutCh <-chan time.Time
-	if s.config.WriteCoalesceDelay > 0 {
-		writeTimeout = time.NewTimer(s.config.WriteCoalesceDelay)
-		defer writeTimeout.Stop()
+	// FIXME: https://github.com/libp2p/go-libp2p/issues/644
+	// Write coalescing is disabled for now.
 
-		writeTimeoutCh = writeTimeout.C
-	} else {
-		ch := make(chan time.Time)
-		close(ch)
-		writeTimeoutCh = ch
-	}
+	//writer := pool.Writer{W: s.conn}
+
+	//var writeTimeout *time.Timer
+	//var writeTimeoutCh <-chan time.Time
+	//if s.config.WriteCoalesceDelay > 0 {
+	//	writeTimeout = time.NewTimer(s.config.WriteCoalesceDelay)
+	//	defer writeTimeout.Stop()
+
+	//	writeTimeoutCh = writeTimeout.C
+	//} else {
+	//	ch := make(chan time.Time)
+	//	close(ch)
+	//	writeTimeoutCh = ch
+	//}
 
 	for {
 		// yield after processing the last message, if we've shutdown.
@@ -436,29 +439,29 @@ func (s *Session) sendLoop() error {
 		case buf = <-s.sendCh:
 		case <-s.shutdownCh:
 			return nil
-		default:
-			select {
-			case buf = <-s.sendCh:
-			case <-s.shutdownCh:
-				return nil
-			case <-writeTimeoutCh:
-				if err := writer.Flush(); err != nil {
-					if os.IsTimeout(err) {
-						err = ErrConnectionWriteTimeout
-					}
-					return err
-				}
+			//default:
+			//	select {
+			//	case buf = <-s.sendCh:
+			//	case <-s.shutdownCh:
+			//		return nil
+			//	case <-writeTimeoutCh:
+			//		if err := writer.Flush(); err != nil {
+			//			if os.IsTimeout(err) {
+			//				err = ErrConnectionWriteTimeout
+			//			}
+			//			return err
+			//		}
 
-				select {
-				case buf = <-s.sendCh:
-				case <-s.shutdownCh:
-					return nil
-				}
+			//		select {
+			//		case buf = <-s.sendCh:
+			//		case <-s.shutdownCh:
+			//			return nil
+			//		}
 
-				if writeTimeout != nil {
-					writeTimeout.Reset(s.config.WriteCoalesceDelay)
-				}
-			}
+			//		if writeTimeout != nil {
+			//			writeTimeout.Reset(s.config.WriteCoalesceDelay)
+			//		}
+			//	}
 		}
 
 		if err := extendWriteDeadline(); err != nil {
@@ -506,14 +509,6 @@ func (s *Session) recvLoop() error {
 				s.logger.Printf("[ERR] yamux: Failed to read header: %v", err)
 			}
 			return err
-		}
-
-		// Reset the keepalive timer every time we receive data.
-		// There's no reason to keepalive if we're active. Worse, if the
-		// peer is busy sending us stuff, the pong might get stuck
-		// behind a bunch of data.
-		if s.keepaliveTimer != nil {
-			s.keepaliveTimer.Reset(s.config.KeepAliveInterval)
 		}
 
 		// Verify the version

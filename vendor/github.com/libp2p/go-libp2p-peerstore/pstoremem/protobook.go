@@ -28,7 +28,7 @@ type memoryProtoBook struct {
 
 var _ pstore.ProtoBook = (*memoryProtoBook)(nil)
 
-func NewProtoBook() *memoryProtoBook {
+func NewProtoBook() pstore.ProtoBook {
 	return &memoryProtoBook{
 		interned: make(map[string]string, 256),
 		segments: func() (ret protoSegments) {

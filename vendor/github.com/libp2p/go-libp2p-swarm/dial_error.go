@@ -2,7 +2,6 @@ package swarm
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -19,10 +18,6 @@ type DialError struct {
 	DialErrors []TransportError
 	Cause      error
 	Skipped    int
-}
-
-func (e *DialError) Timeout() bool {
-	return os.IsTimeout(e.Cause)
 }
 
 func (e *DialError) recordErr(addr ma.Multiaddr, err error) {
@@ -53,7 +48,11 @@ func (e *DialError) Error() string {
 
 // Unwrap implements https://godoc.org/golang.org/x/xerrors#Wrapper.
 func (e *DialError) Unwrap() error {
-	return e.Cause
+	// If we have a context error, that's the "ultimate" error.
+	if e.Cause != nil {
+		return e.Cause
+	}
+	return nil
 }
 
 var _ error = (*DialError)(nil)

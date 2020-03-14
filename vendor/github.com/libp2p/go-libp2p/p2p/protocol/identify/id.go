@@ -23,7 +23,6 @@ import (
 	logging "github.com/ipfs/go-log"
 
 	ma "github.com/multiformats/go-multiaddr"
-	manet "github.com/multiformats/go-multiaddr-net"
 	msmux "github.com/multiformats/go-multistream"
 )
 
@@ -86,9 +85,7 @@ type IDService struct {
 
 	subscription event.Subscription
 	emitters     struct {
-		evtPeerProtocolsUpdated        event.Emitter
-		evtPeerIdentificationCompleted event.Emitter
-		evtPeerIdentificationFailed    event.Emitter
+		evtPeerProtocolsUpdated event.Emitter
 	}
 }
 
@@ -126,14 +123,6 @@ func NewIDService(ctx context.Context, h host.Host, opts ...Option) *IDService {
 	s.emitters.evtPeerProtocolsUpdated, err = h.EventBus().Emitter(&event.EvtPeerProtocolsUpdated{})
 	if err != nil {
 		log.Warningf("identify service not emitting peer protocol updates; err: %s", err)
-	}
-	s.emitters.evtPeerIdentificationCompleted, err = h.EventBus().Emitter(&event.EvtPeerIdentificationCompleted{})
-	if err != nil {
-		log.Warningf("identify service not emitting identification completed events; err: %s", err)
-	}
-	s.emitters.evtPeerIdentificationFailed, err = h.EventBus().Emitter(&event.EvtPeerIdentificationFailed{})
-	if err != nil {
-		log.Warningf("identify service not emitting identification failed events; err: %s", err)
 	}
 
 	h.SetStreamHandler(ID, s.requestHandler)
@@ -175,11 +164,6 @@ func (ids *IDService) ObservedAddrsFor(local ma.Multiaddr) []ma.Multiaddr {
 }
 
 func (ids *IDService) IdentifyConn(c network.Conn) {
-	var (
-		s   network.Stream
-		err error
-	)
-
 	ids.currmu.Lock()
 	if wait, found := ids.currid[c]; found {
 		ids.currmu.Unlock()
@@ -196,16 +180,9 @@ func (ids *IDService) IdentifyConn(c network.Conn) {
 		ids.currmu.Lock()
 		delete(ids.currid, c)
 		ids.currmu.Unlock()
-
-		// emit the appropriate event.
-		if p := c.RemotePeer(); err == nil {
-			ids.emitters.evtPeerIdentificationCompleted.Emit(event.EvtPeerIdentificationCompleted{Peer: p})
-		} else {
-			ids.emitters.evtPeerIdentificationFailed.Emit(event.EvtPeerIdentificationFailed{Peer: p, Reason: err})
-		}
 	}()
 
-	s, err = c.NewStream()
+	s, err := c.NewStream()
 	if err != nil {
 		log.Debugf("error opening initial stream for %s: %s", ID, err)
 		log.Event(context.TODO(), "IdentifyOpenFailed", c.RemotePeer())
@@ -216,7 +193,7 @@ func (ids *IDService) IdentifyConn(c network.Conn) {
 	s.SetProtocol(ID)
 
 	// ok give the response to our handler.
-	if err = msmux.SelectProtoOrFail(ID, s); err != nil {
+	if err := msmux.SelectProtoOrFail(ID, s); err != nil {
 		log.Event(context.TODO(), "IdentifyOpenFailed", c.RemotePeer(), logging.Metadata{"error": err})
 		s.Reset()
 		return
@@ -333,14 +310,9 @@ func (ids *IDService) populateMessage(mes *pb.Identify, c network.Conn) {
 
 	// set listen addrs, get our latest addrs from Host.
 	laddrs := ids.Host.Addrs()
-	// Note: LocalMultiaddr is sometimes 0.0.0.0
-	viaLoopback := manet.IsIPLoopback(c.LocalMultiaddr()) || manet.IsIPLoopback(c.RemoteMultiaddr())
-	mes.ListenAddrs = make([][]byte, 0, len(laddrs))
-	for _, addr := range laddrs {
-		if !viaLoopback && manet.IsIPLoopback(addr) {
-			continue
-		}
-		mes.ListenAddrs = append(mes.ListenAddrs, addr.Bytes())
+	mes.ListenAddrs = make([][]byte, len(laddrs))
+	for i, addr := range laddrs {
+		mes.ListenAddrs[i] = addr.Bytes()
 	}
 	log.Debugf("%s sent listen addrs to %s: %s", c.LocalPeer(), c.RemotePeer(), laddrs)
 

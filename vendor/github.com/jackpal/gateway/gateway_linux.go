@@ -1,30 +1,47 @@
 package gateway
 
 import (
-	"fmt"
-	"io/ioutil"
 	"net"
-	"os"
-)
-
-
-const (
-	// See http://man7.org/linux/man-pages/man8/route.8.html
-	file  = "/proc/net/route"
+	"os/exec"
 )
 
 func DiscoverGateway() (ip net.IP, err error) {
-	f, err := os.Open(file)
+	ip, err = discoverGatewayUsingRoute()
 	if err != nil {
-		return nil, fmt.Errorf("Can't access %s", file)
+		ip, err = discoverGatewayUsingIpRouteShow()
 	}
-	defer f.Close()
-
-	bytes, err := ioutil.ReadAll(f)
 	if err != nil {
-		return nil, fmt.Errorf("Can't read %s", file)
+		ip, err = discoverGatewayUsingIpRouteGet()
 	}
-	return parseLinuxProcNetRoute(bytes)
+	return
 }
 
+func discoverGatewayUsingIpRouteShow() (net.IP, error) {
+	routeCmd := exec.Command("ip", "route", "show")
+	output, err := routeCmd.CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
 
+	return parseLinuxIPRouteShow(output)
+}
+
+func discoverGatewayUsingIpRouteGet() (net.IP, error) {
+	routeCmd := exec.Command("ip", "route", "get", "8.8.8.8")
+	output, err := routeCmd.CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+
+	return parseLinuxIPRouteGet(output)
+}
+
+func discoverGatewayUsingRoute() (net.IP, error) {
+	routeCmd := exec.Command("route", "-n")
+	output, err := routeCmd.CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+
+	return parseLinuxRoute(output)
+}
